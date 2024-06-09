@@ -14,7 +14,7 @@ use std::io::{self, Stdout};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
 
 const PALETTES: [tailwind::Palette; 4] = [
-    tailwind::BLUE,
+    tailwind::PURPLE,
     tailwind::EMERALD,
     tailwind::INDIGO,
     tailwind::RED,
@@ -263,10 +263,10 @@ fn main() {
                     app.refresh();
                 }
                 KeyCode::Char('k') => {
-                    app.next();
+                    app.previous();
                 }
                 KeyCode::Char('j') => {
-                    app.previous();
+                    app.next();
                 }
                 KeyCode::Char('d') => {
                     app.delete_proc();
