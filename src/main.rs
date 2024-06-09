@@ -77,6 +77,7 @@ struct App {
     scroll_state: ScrollbarState,
     ctx: System,
     colors: TableColors,
+    color_index: usize,
 }
 
 const ITEM_HEIGHT: usize = 4;
@@ -89,6 +90,7 @@ impl App {
             items: Vec::new(),
             ctx: System::new_all(),
             colors: TableColors::new(&PALETTES[0]),
+            color_index: 0,
         }
     }
 
@@ -124,6 +126,10 @@ impl App {
         };
         self.state.select(Some(i));
         self.scroll_state = self.scroll_state.position(i * ITEM_HEIGHT);
+    }
+
+    pub fn set_colors(&mut self) {
+        self.colors = TableColors::new(&PALETTES[self.color_index]);
     }
 
     pub fn set_scroll(&mut self) {
@@ -168,24 +174,45 @@ impl App {
 
     pub fn render(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) {
         let widths = [
-            Constraint::Length(5),
+            Constraint::Length(25),
             Constraint::Length(5),
             Constraint::Length(10),
             Constraint::Length(10),
         ];
-        let mut rows: Vec<Row> = Vec::new();
+        let mut rows_pusher: Vec<Row> = Vec::new();
         self.items.iter().for_each(|r| {
-            rows.push(Row::new(vec![
+            rows_pusher.push(Row::new(vec![
                 r.name.clone(),
                 r.pid.clone(),
                 r.cpu_usage.clone(),
                 r.memory.clone(),
             ]))
         });
+
+        let rows = self.items.iter().enumerate().map(|(i, data)| {
+            let color = match i % 2 {
+                0 => self.colors.normal_row_color,
+                _ => self.colors.alt_row_color,
+            };
+            let item = data.ref_array();
+            item.into_iter()
+                .map(|content| Cell::from(Text::from(format!("\n{content}\n"))))
+                .collect::<Row>()
+                .style(Style::new().fg(self.colors.row_fg).bg(color))
+                .height(2)
+        });
+
+        let header_style = Style::default()
+            .fg(self.colors.header_fg)
+            .bg(self.colors.header_bg);
+        let selected_style = Style::default()
+            .add_modifier(Modifier::REVERSED)
+            .fg(self.colors.selected_style_fg);
         let table = Table::new(rows, widths)
             .block(Block::new().title("Processes"))
-            .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            .highlight_symbol(">>")
+            .highlight_style(selected_style)
+            .bg(self.colors.buffer_bg)
+            //.highlight_symbol(">>")
             .block(Block::new())
             .highlight_spacing(HighlightSpacing::Always)
             .block(
@@ -193,12 +220,15 @@ impl App {
                     .border_type(BorderType::Double)
                     .border_style(Style::new().fg(self.colors.footer_border_color)),
             )
-            .header(Row::new(vec![
-                "NAME".to_string(),
-                "PID".to_string(),
-                "CPU USAGE".to_string(),
-                "MEMORY".to_string(),
-            ]));
+            .header(
+                Row::new(vec![
+                    "NAME".to_string(),
+                    "PID".to_string(),
+                    "CPU USAGE".to_string(),
+                    "MEMORY".to_string(),
+                ])
+                .style(header_style),
+            );
         terminal
             .draw(|frame| {
                 let area = frame.size();
@@ -219,6 +249,7 @@ fn main() {
     let mut terminal = Terminal::with_options(backend, options).unwrap();
 
     let mut app = App::new();
+    app.set_colors();
     app.get_proc();
     app.set_scroll();
 
