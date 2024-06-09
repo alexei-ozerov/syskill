@@ -1,0 +1,10 @@
+[package]
+name = "syskill"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.27.0"
+ratatui = "0.26.3"
+style = "0.1.0"
+sysinfo = "0.22.0"
