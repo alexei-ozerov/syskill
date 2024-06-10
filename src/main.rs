@@ -136,6 +136,9 @@ impl App {
             });
             data_vec.push(vec![name.to_string(), pid, cpu_usage, memory]);
         }
+
+        self.items
+            .sort_by_key(|obj| obj.pid.parse::<i32>().unwrap());
     }
 
     pub fn delete_proc(&mut self) {
