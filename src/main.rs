@@ -1,15 +1,8 @@
-use crossterm::event::DisableMouseCapture;
-use crossterm::event::EnableMouseCapture;
-use crossterm::event::{read, Event, KeyCode};
-use crossterm::execute;
-use crossterm::terminal::disable_raw_mode;
-use crossterm::terminal::enable_raw_mode;
-use crossterm::terminal::EnterAlternateScreen;
-use crossterm::terminal::LeaveAlternateScreen;
-use ratatui::prelude::*;
-use ratatui::style::palette::tailwind;
-use ratatui::widgets::*;
-use ratatui::Terminal;
+use crossterm::{
+    event::{read, Event, KeyCode},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
+use ratatui::{prelude::*, style::palette::tailwind, widgets::*, Terminal};
 use std::io::{self, Stdout};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
 
@@ -137,6 +130,7 @@ impl App {
     }
 
     pub fn get_proc(&mut self) {
+        self.ctx.refresh_cpu();
         let system = &self.ctx;
         let processes = system.processes();
         let mut data_vec = Vec::new();
@@ -278,5 +272,4 @@ fn main() {
 
     disable_raw_mode().unwrap();
     terminal.clear().unwrap();
-    //terminal.show_cursor().unwrap();
 }
