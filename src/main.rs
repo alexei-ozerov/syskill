@@ -51,18 +51,6 @@ impl Data {
     const fn ref_array(&self) -> [&String; 4] {
         [&self.name, &self.pid, &self.cpu_usage, &self.memory]
     }
-    fn name(&self) -> &str {
-        &self.name
-    }
-    fn pid(&self) -> &str {
-        &self.pid
-    }
-    fn cpu_usage(&self) -> &str {
-        &self.cpu_usage
-    }
-    fn memory(&self) -> &str {
-        &self.memory
-    }
 }
 struct App {
     state: TableState,
