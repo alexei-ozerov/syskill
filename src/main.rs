@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{read, Event, KeyCode},
+    event::{read, Event, KeyCode, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*, Terminal};
@@ -52,6 +52,13 @@ impl Data {
         [&self.name, &self.pid, &self.cpu_usage, &self.memory]
     }
 }
+
+#[derive(Debug)]
+enum AppState {
+    ProcessMode,
+    SearchMode,
+}
+
 struct App {
     state: TableState,
     items: Vec<Data>,
@@ -59,6 +66,11 @@ struct App {
     ctx: System,
     colors: TableColors,
     color_index: usize,
+    show_popup: bool,
+    mode: AppState,
+    input: String,
+    messages: Vec<String>,
+    character_index: usize,
 }
 
 const ITEM_HEIGHT: usize = 4;
@@ -72,11 +84,98 @@ impl App {
             ctx: System::new_all(),
             colors: TableColors::new(&PALETTES[0]),
             color_index: 0,
+            show_popup: false,
+            mode: AppState::ProcessMode,
+            input: String::new(),
+            messages: Vec::new(),
+            character_index: 0,
         }
     }
 
     pub fn clean(&mut self) {
         self.items = Vec::new();
+    }
+
+    pub fn move_cursor_left(&mut self) {
+        let cursor_moved_left = self.character_index.saturating_sub(1);
+        self.character_index = self.clamp_cursor(cursor_moved_left);
+    }
+
+    pub fn move_cursor_right(&mut self) {
+        let cursor_moved_right = self.character_index.saturating_add(1);
+        self.character_index = self.clamp_cursor(cursor_moved_right);
+    }
+
+    pub fn enter_char(&mut self, new_char: char) {
+        let index = self.byte_index();
+        self.input.insert(index, new_char);
+        self.move_cursor_right();
+    }
+
+    /// Returns the byte index based on the character position.
+    ///
+    /// Since each character in a string can be contain multiple bytes, it's necessary to calculate
+    /// the byte index based on the index of the character.
+    pub fn byte_index(&mut self) -> usize {
+        self.input
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(self.character_index)
+            .unwrap_or(self.input.len())
+    }
+
+    pub fn delete_char(&mut self) {
+        let is_not_cursor_leftmost = self.character_index != 0;
+        if is_not_cursor_leftmost {
+            // Method "remove" is not used on the saved text for deleting the selected char.
+            // Reason: Using remove on String works on bytes instead of the chars.
+            // Using remove would require special care because of char boundaries.
+
+            let current_index = self.character_index;
+            let from_left_to_current_index = current_index - 1;
+
+            // Getting all characters before the selected character.
+            let before_char_to_delete = self.input.chars().take(from_left_to_current_index);
+            // Getting all characters after selected character.
+            let after_char_to_delete = self.input.chars().skip(current_index);
+
+            // Put all characters together except the selected one.
+            // By leaving the selected one out, it is forgotten and therefore deleted.
+            self.input = before_char_to_delete.chain(after_char_to_delete).collect();
+            self.move_cursor_left();
+        }
+    }
+
+    pub fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
+        new_cursor_pos.clamp(0, self.input.chars().count())
+    }
+
+    pub fn reset_cursor(&mut self) {
+        self.character_index = 0;
+    }
+
+    pub fn submit_message(&mut self) {
+        self.messages.push(self.input.clone());
+
+        // TODO (ozerova): Add search function
+        self.search();
+
+        self.input.clear();
+        self.reset_cursor();
+    }
+
+    pub fn search(&mut self) {
+        let msg = self.input.clone();
+        let procn = self.items.clone();
+
+        let mut parsed_processes = Vec::new();
+        procn.iter().for_each(|proc| {
+            if proc.name.contains(&msg) {
+                parsed_processes.push(proc.clone());
+            }
+        });
+
+        self.items = parsed_processes.clone();
     }
 
     pub fn next(&mut self) {
@@ -214,11 +313,54 @@ impl App {
                 ])
                 .style(header_style),
             );
+
         terminal
             .draw(|frame| {
                 let area = frame.size();
-                frame.render_stateful_widget(table, area, &mut self.state.clone());
+
+                let vertical = Layout::vertical([
+                    Constraint::Length(1),
+                    Constraint::Min(3)
+                ]);
+                let [help_area, table_area] = vertical.areas(area);
+
+                frame.render_stateful_widget(table, table_area, &mut self.state.clone());
                 frame.set_cursor(0, 0);
+
+                let msg = vec![
+                    "\n".into(),
+                    "Press ".into(),
+                    "/".bold(),
+                    " to toggle search, press ".into(),
+                    "enter".bold(),
+                    " to confirm search, press ".into(),
+                    "r".bold(),
+                    " to refresh process list, press ".into(),
+                    "d".bold(),
+                    " to delete selected process, press ".into(),
+                    "q".bold(),
+                    " to exit.".into(),
+                ];
+
+                let text = Text::from(Line::from(msg));
+                frame.render_widget(Paragraph::new(text).style(Style::default()), help_area);
+
+                // Popup logic
+                if self.show_popup {
+                    let block = Block::bordered().title("Search");
+                    let area = centered_rect(60, 20, area);
+
+                    let input = Paragraph::new(self.input.as_str()).style(match self.mode {
+                        AppState::ProcessMode => Style::default(),
+                        AppState::SearchMode => Style::default().fg(Color::Yellow),
+                    });
+
+                    let inner_area = block.inner(area);
+
+                    frame.render_widget(Clear, area); //this clears out the background
+                    frame.render_widget(block, area);
+                    frame.render_widget(input, inner_area);
+                }
             })
             .unwrap();
     }
@@ -242,25 +384,74 @@ fn main() {
         app.render(&mut terminal);
 
         if let Ok(Event::Key(key_event)) = read() {
-            match key_event.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Char('r') => {
-                    app.refresh();
+            match app.mode {
+                AppState::ProcessMode => match key_event.code {
+                    KeyCode::Char('q') => break,
+                    KeyCode::Char('r') => {
+                        app.refresh();
+                    }
+                    KeyCode::Char('k') => {
+                        app.previous();
+                    }
+                    KeyCode::Char('j') => {
+                        app.next();
+                    }
+                    KeyCode::Char('d') => {
+                        app.delete_proc();
+                    }
+                    KeyCode::Char('/') => {
+                        app.mode = AppState::SearchMode;
+                        app.show_popup = !app.show_popup
+                    }
+                    _ => (),
+                },
+                AppState::SearchMode if key_event.kind == KeyEventKind::Press => {
+                    match key_event.code {
+                        KeyCode::Char('/') => {
+                            app.mode = AppState::ProcessMode;
+                            app.show_popup = !app.show_popup
+                        }
+                        KeyCode::Enter => {
+                            app.submit_message();
+                            app.mode = AppState::ProcessMode;
+                            app.show_popup = !app.show_popup
+                        }
+                        KeyCode::Char(to_insert) => {
+                            app.enter_char(to_insert);
+                        }
+                        KeyCode::Backspace => {
+                            app.delete_char();
+                        }
+                        KeyCode::Left => {
+                            app.move_cursor_left();
+                        }
+                        KeyCode::Right => {
+                            app.move_cursor_right();
+                        }
+                        _ => (),
+                    }
                 }
-                KeyCode::Char('k') => {
-                    app.previous();
-                }
-                KeyCode::Char('j') => {
-                    app.next();
-                }
-                KeyCode::Char('d') => {
-                    app.delete_proc();
-                }
-                _ => (),
+                AppState::SearchMode => {}
             }
         }
     }
 
     disable_raw_mode().unwrap();
     terminal.clear().unwrap();
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::vertical([
+        Constraint::Percentage((100 - percent_y) / 2),
+        Constraint::Percentage(percent_y),
+        Constraint::Percentage((100 - percent_y) / 2),
+    ])
+    .split(r);
+
+    Layout::horizontal([
+        Constraint::Percentage((100 - percent_x) / 2),
+        Constraint::Percentage(percent_x),
+        Constraint::Percentage((100 - percent_x) / 2),
+    ])
+    .split(popup_layout[1])[1]
 }
