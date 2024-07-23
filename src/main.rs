@@ -4,7 +4,7 @@ use crossterm::{
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*, Terminal};
 use std::io::{self, Stdout};
-use sysinfo::{Pid, ProcessExt, System, SystemExt};
+use sysinfo::{Pid, System};
 
 const PALETTES: [tailwind::Palette; 4] = [
     tailwind::PURPLE,
@@ -243,7 +243,7 @@ impl App {
     pub fn delete_proc(&mut self) {
         let row = &self.items[self.state.selected().unwrap() as usize].pid;
         let s = System::new_all();
-        if let Some(process) = s.process(Pid::from(row.parse::<i32>().unwrap())) {
+        if let Some(process) = s.process(Pid::from(row.parse::<usize>().unwrap())) {
             process.kill();
         }
         self.refresh();
