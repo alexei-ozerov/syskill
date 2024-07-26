@@ -384,54 +384,56 @@ fn main() {
         app.render(&mut terminal);
 
         if let Ok(Event::Key(key_event)) = read() {
-            match app.mode {
-                AppState::ProcessMode => match key_event.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Char('r') => {
-                        app.refresh();
-                    }
-                    KeyCode::Char('k') => {
-                        app.previous();
-                    }
-                    KeyCode::Char('j') => {
-                        app.next();
-                    }
-                    KeyCode::Char('d') => {
-                        app.delete_proc();
-                    }
-                    KeyCode::Char('/') => {
-                        app.mode = AppState::SearchMode;
-                        app.show_popup = !app.show_popup
-                    }
-                    _ => (),
-                },
-                AppState::SearchMode if key_event.kind == KeyEventKind::Press => {
-                    match key_event.code {
+            if key_event.kind == KeyEventKind::Press {
+                match app.mode {
+                    AppState::ProcessMode => match key_event.code {
+                        KeyCode::Char('q') => break,
+                        KeyCode::Char('r') => {
+                            app.refresh();
+                        }
+                        KeyCode::Char('k') => {
+                            app.previous();
+                        }
+                        KeyCode::Char('j') => {
+                            app.next();
+                        }
+                        KeyCode::Char('d') => {
+                            app.delete_proc();
+                        }
                         KeyCode::Char('/') => {
-                            app.mode = AppState::ProcessMode;
+                            app.mode = AppState::SearchMode;
                             app.show_popup = !app.show_popup
-                        }
-                        KeyCode::Enter => {
-                            app.submit_message();
-                            app.mode = AppState::ProcessMode;
-                            app.show_popup = !app.show_popup
-                        }
-                        KeyCode::Char(to_insert) => {
-                            app.enter_char(to_insert);
-                        }
-                        KeyCode::Backspace => {
-                            app.delete_char();
-                        }
-                        KeyCode::Left => {
-                            app.move_cursor_left();
-                        }
-                        KeyCode::Right => {
-                            app.move_cursor_right();
                         }
                         _ => (),
+                    },
+                    AppState::SearchMode if key_event.kind == KeyEventKind::Press => {
+                        match key_event.code {
+                            KeyCode::Char('/') => {
+                                app.mode = AppState::ProcessMode;
+                                app.show_popup = !app.show_popup
+                            }
+                            KeyCode::Enter => {
+                                app.submit_message();
+                                app.mode = AppState::ProcessMode;
+                                app.show_popup = !app.show_popup
+                            }
+                            KeyCode::Char(to_insert) => {
+                                app.enter_char(to_insert);
+                            }
+                            KeyCode::Backspace => {
+                                app.delete_char();
+                            }
+                            KeyCode::Left => {
+                                app.move_cursor_left();
+                            }
+                            KeyCode::Right => {
+                                app.move_cursor_right();
+                            }
+                            _ => (),
+                        }
                     }
+                    AppState::SearchMode => {}
                 }
-                AppState::SearchMode => {}
             }
         }
     }
