@@ -329,21 +329,26 @@ impl App {
 
                 let msg = vec![
                     "\n".into(),
+                    "Use ".into(),
+                    "j".bold(),
+                    " and ".into(),
+                    "k".bold(),
+                    " to scroll up and down. Press ".into(),
+                    "r".bold(),
+                    " to refresh process list, and press ".into(),
+                    "d".bold(),
+                    " to delete selected process. ".into(),
                     "Press ".into(),
                     "/".bold(),
                     " to toggle search, press ".into(),
                     "enter".bold(),
-                    " to confirm search, press ".into(),
-                    "r".bold(),
-                    " to refresh process list, press ".into(),
-                    "d".bold(),
-                    " to delete selected process, press ".into(),
+                    " to confirm search. Press ".into(),
                     "q".bold(),
                     " to exit.".into(),
                 ];
 
                 let text = Text::from(Line::from(msg));
-                frame.render_widget(Paragraph::new(text).style(Style::default()), help_area);
+                frame.render_widget(Paragraph::new(text).wrap(Wrap { trim: true }).style(Style::default()), help_area);
 
                 // Popup logic
                 if self.show_popup {
